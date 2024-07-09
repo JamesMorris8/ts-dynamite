@@ -16,15 +16,39 @@ enum RoundResult {
     P1_WATER = 9
 }
 
+
 class Bot {
+    sensitivities: Array<number> = [2, 5, 10, 50, 100]
+    botArray: Array<SubBot> = []
+    constructor() {
+        for (let i = 0; i < this.sensitivities.length; i++) {
+            this.botArray.push(new SubBot(this.sensitivities[i]));
+        }
+    }
+
+    public makeMove(gamestate: Gamestate): BotSelection {
+        let botSuccessArray: Array<number> = [];
+        let botResultArray: Array<BotSelection> = [];
+        for (let i = 0; i < this.botArray.length; i++) {
+            botResultArray.push(this.botArray[i].makeMove(gamestate))
+            botSuccessArray.push(this.botArray[i].currentRating)
+        }
+        return botResultArray[botSuccessArray.indexOf(Math.max(...botSuccessArray))]
+    }
+}
+
+class SubBot {
+    sensitivity: number;
     botStorage = [];
     ourRemainingDynamites: number;
     theirUsedDynamites: number;
     classifier;
+    currentRating: number = 0;
 
-    constructor() {
+    constructor(sensitivity: number) {
         this.ourRemainingDynamites = 100;
         this.theirUsedDynamites = 0;
+        this.sensitivity = sensitivity;
     }
 
     private basicPredict(gamestate: Gamestate): Array<number>{
@@ -106,7 +130,7 @@ class Bot {
 
     private convertRounds(gamestate: Gamestate, entrypoint: number) {
         let counter: Array<number> = [0,0,0,0,0,0,0,0,0,0];
-        for (let i = entrypoint - 100; i < entrypoint; i++) {
+        for (let i = entrypoint - this.sensitivity; i < entrypoint; i++) {
             switch (gamestate.rounds[i].p2) {
                 case('R'):
                     counter[RoundResult.P2_ROCK] += 1;
@@ -145,9 +169,27 @@ class Bot {
         return counter;
     }
 
+    private LastRoundPoints(gamestate: Gamestate) {
+        let pointsWon = 0;
+        switch (gamestate.rounds[gamestate.rounds.length - 1]) {
+            case ({p1:'D', p2:'R'} || {p1:'D', p2:'P'} || {p1:'D', p2:'S'} || 
+                {p1:'R', p2:'S'} || {p1:'P', p2:'R'} || {p1:'S', p2:'P'} || {p1:'W', p2:'D'} ):
+                pointsWon += 1;
+                break;
+            case ({p1:'D', p2:'W'} || {p1:'R', p2:'P'} || {p1:'P', p2:'S'} || 
+                {p1:'S', p2:'R'} || {p1:'W', p2:'R'} || {p1:'W', p2:'P'} || {p1:'W', p2:'S'} ):
+                pointsWon -= 1;
+                break;
+            default:
+                break;
+        }
+        return pointsWon;
+    }
+
     private logPreviousRounds(gamestate: Gamestate) {
         let runTime = gamestate.rounds.length;
-        if (runTime < 101) {
+        this.currentRating += this.LastRoundPoints(gamestate);
+        if (runTime < this.sensitivity + 1) {
             return;
         }
         let counter: Array<number> = this.convertRounds(gamestate, runTime - 1);
@@ -184,7 +226,8 @@ class Bot {
 
         this.logPreviousRounds(gamestate);
 
-        if (runTime < 200) {
+
+        if (runTime < this.sensitivity + 30) {
             let basicPrediction = this.basicPredictionToMove(gamestate);
             if (basicPrediction === 'D'){
             this.ourRemainingDynamites -= 1;
@@ -196,7 +239,7 @@ class Bot {
         // otherwise if dynamite prediction is low and water baloon prediction is reasonably low then use rock/p/sci
         
         
-        if (runTime >= 200 && runTime % 50 == 0)
+        if (runTime === this.sensitivity + 30 || (runTime >= this.sensitivity + 30 && runTime % 50 == 0))
         {
             this.classifier = new jsregression.MultiClassLogistic({
                 alpha: 0.1,
