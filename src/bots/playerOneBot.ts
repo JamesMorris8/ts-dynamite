@@ -30,7 +30,7 @@ class Bot {
     private basicPredict(gamestate: Gamestate): Array<number>{
         let counter: Array<number> = [0,0,0,0,0];
         let runTime = gamestate.rounds.length;
-        for (let i = Math.max(0, runTime - 20) ; i < runTime; i++) {
+        for (let i = Math.max(0, runTime - 10) ; i < runTime; i++) {
             switch (gamestate.rounds[i].p2) {
                 case('R'):
                     counter[RoundResult.P2_ROCK] += 1;
@@ -104,9 +104,9 @@ class Bot {
         return prediction;
     }
 
-    private convert20Rounds(gamestate: Gamestate, entrypoint: number) {
+    private convertRounds(gamestate: Gamestate, entrypoint: number) {
         let counter: Array<number> = [0,0,0,0,0,0,0,0,0,0];
-        for (let i = entrypoint - 20; i < entrypoint; i++) {
+        for (let i = entrypoint - 100; i < entrypoint; i++) {
             switch (gamestate.rounds[i].p2) {
                 case('R'):
                     counter[RoundResult.P2_ROCK] += 1;
@@ -145,12 +145,12 @@ class Bot {
         return counter;
     }
 
-    private logPrevious20Rounds(gamestate: Gamestate) {
+    private logPreviousRounds(gamestate: Gamestate) {
         let runTime = gamestate.rounds.length;
-        if (runTime < 21) {
+        if (runTime < 101) {
             return;
         }
-        let counter: Array<number> = this.convert20Rounds(gamestate, runTime - 1);
+        let counter: Array<number> = this.convertRounds(gamestate, runTime - 1);
         let actualResult: number = 0;
         switch (gamestate.rounds[runTime - 1].p2) {
             case('R'):
@@ -182,9 +182,9 @@ class Bot {
             this.theirUsedDynamites += 1;
         }
 
-        this.logPrevious20Rounds(gamestate);
+        this.logPreviousRounds(gamestate);
 
-        if (runTime < 30) {
+        if (runTime < 200) {
             let basicPrediction = this.basicPredictionToMove(gamestate);
             if (basicPrediction === 'D'){
             this.ourRemainingDynamites -= 1;
@@ -196,7 +196,7 @@ class Bot {
         // otherwise if dynamite prediction is low and water baloon prediction is reasonably low then use rock/p/sci
         
         
-        if (runTime === 30 || runTime === 50 || runTime === 100 || runTime === 200 || runTime === 500)
+        if (runTime >= 200 && runTime % 50 == 0)
         {
             this.classifier = new jsregression.MultiClassLogistic({
                 alpha: 0.1,
@@ -206,7 +206,7 @@ class Bot {
             this.classifier.fit(this.botStorage);
         }
         // need this to be of form [x1 x2 x3 x4 x5..., y] in each row
-        var classifierPrediction = this.classifier.transform(this.convert20Rounds(gamestate, runTime));
+        var classifierPrediction = this.classifier.transform(this.convertRounds(gamestate, runTime));
         // keep counter of how many dynamites they use?
         let predictionChoice: BotSelection = 'R';
         switch (classifierPrediction) {
